@@ -56,8 +56,11 @@ module PerfmonAgent
       end
       
       File.open(pidfile, 'w') { |file| file.write("#{Process.pid}") }
-            
+
       @pm = PerfmonMetrics.new
+
+      add_custom_metric_types(@pm.metric_types)
+
       countersfile = NewRelic::Plugin::Config.config.newrelic['countersfile'].to_s
       if countersfile.to_s.empty? 
         counters_file = File.expand_path(File.dirname(__FILE__)) + "/config/perfmon_totals_counters.txt"
@@ -143,9 +146,37 @@ module PerfmonAgent
   def thishost
     
   end
-  end 
-  
+
+  def add_custom_metric_types(metricTypes)
+
+    custom_metrics_file = File.expand_path(File.dirname(__FILE__)) + "/config/perfmon_custom_metrics.txt"
+
+    if File.file?(custom_metrics_file)
+      if !custom_metrics_file.to_s.empty?
+        puts("Using Custom Metrics File: #{custom_metrics_file}")
+      end
+      i = 0
+      @customMetrics = Hash.new()
+      mlines = File.open(custom_metrics_file, "r")
+      mlines.each { |l|
+        if !l.chr.eql?("#") && !l.chr.eql?("\n")
+          @customMetrics[l.slice(0, l.rindex(',')).tr('"', '').strip] = l.slice(l.rindex(',') + 1, l.length).tr('"', '').strip
+        end
+        i += 1
+      }
+      mlines.close
+
+      @customMetrics.each{|name, value| metricTypes[name] = value}
+
+    else
+      # abort("No Perfmon custom metrics file named #{custom_metrics_file}.")
+    end
+
+  end
+
+  end
+
   NewRelic::Plugin::Setup.install_agent :perfmon, self
   NewRelic::Plugin::Run.setup_and_run
-  
+
 end
